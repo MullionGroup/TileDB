@@ -1045,12 +1045,13 @@ class Dimension {
 
     // Domain range must not exceed the maximum unsigned number
     // for integer domains
-    if (domain[0] == std::numeric_limits<T>::min() &&
-        domain[1] == std::numeric_limits<T>::max())
+    if ((!std::is_unsigned<T>::value) &&
+        domain[0] == std::numeric_limits<T>::min() &&
+        domain[1] == std::numeric_limits<T>::max()) {
       return LOG_STATUS(Status::DimensionError(
           "Domain check failed; Domain range (upper + lower + 1) is larger "
           "than the maximum unsigned number"));
-
+    }
     return Status::Ok();
   }
 
