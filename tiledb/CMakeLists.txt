@@ -499,24 +499,13 @@ endif()
 # GCS dependencies
 if (TILEDB_GCS)
   message(STATUS "The TileDB library is compiled with GCS support.")
-  find_package(GCSSDK_EP REQUIRED COMPONENTS gcs)
+  
+  find_package(google_cloud_cpp_storage REQUIRED COMPONENTS gcs)
   target_link_libraries(TILEDB_CORE_OBJECTS_ILIB
     INTERFACE
-       storage_client
+    google-cloud-cpp::storage
   )
   add_definitions(-DHAVE_GCS)
-
-  # work around for GCS finding the shared version of zlib: we will see the Zlib::Zlib
-  # transitive linkage later, and we can use the correct version there.
-  unset(ZLIB_FOUND)
-  unset(ZLIB_LIBRARIES)
-  unset(ZLIB_INCLUDE_DIR)
-
-  get_target_property(_GCS_INTERFACE_LIBS storage_client INTERFACE_LINK_LIBRARIES)
-  if ("ZLIB::ZLIB" IN_LIST _GCS_INTERFACE_LIBS)
-    list(REMOVE_ITEM _GCS_INTERFACE_LIBS "ZLIB::ZLIB")
-    set_property(TARGET storage_client PROPERTY INTERFACE_LINK_LIBRARIES "${_GCS_INTERFACE_LIBS}")
-  endif()
 endif()
 
 # Libcurl
@@ -854,9 +843,9 @@ if (TILEDB_STATIC)
   append_dep_lib(AWSSDK::aws-cpp-sdk-sts)
   append_dep_lib(AWSSDK::aws-cpp-sdk-identity-management)
   append_dep_lib(AzureSDK::AzureSDK)
-  append_dep_lib(GCSSDK::storage_client)
-  append_dep_lib(GCSSDK::google_cloud_cpp_common)
-  append_dep_lib(GCSSDK::crc32c)
+  append_dep_lib(google-cloud-cpp::storage)
+  append_dep_lib(google-cloud-cpp::common)
+  append_dep_lib(google-cloud-cpp::crc32c)
   append_dep_lib(spdlog::spdlog)
   append_dep_lib(libmagic)
   append_dep_lib(WebP::webp)
