@@ -36,19 +36,28 @@ include(TileDBCommon)
 # modules.
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${TILEDB_EP_INSTALL_PREFIX}")
 
+# First try the CMake-provided find script.
+if (NOT TILEDB_FORCE_ALL_DEPS)
+  find_package(google_cloud_cpp_storage ${TILEDB_DEPS_NO_DEFAULT_PATH})
+  set(GCSSDK_FOUND ${google_cloud_cpp_storage_FOUND})
+endif()
+
 # Try searching for the SDK in the EP prefix.
 set(GCSSDK_DIR "${TILEDB_EP_INSTALL_PREFIX}")
 
 # First check for a static version in the EP prefix.
 # The storage client is installed as the cmake package storage_client
 # TODO: This should be replaced with proper find_package as google installs cmake targets for the subprojects
-if (NOT TILEDB_FORCE_ALL_DEPS OR TILEDB_GCSSDK_EP_BUILT)
-  find_package(storage_client
-    PATHS ${TILEDB_EP_INSTALL_PREFIX}
-          ${TILEDB_DEPS_NO_DEFAULT_PATH}
-  )
-  set(GCSSDK_FOUND ${storage_client_FOUND})
+if (NOT GCSSDK_FOUND)
+  if (NOT TILEDB_FORCE_ALL_DEPS OR TILEDB_GCSSDK_EP_BUILT)
+    find_package(google_cloud_cpp_storage
+      PATHS ${TILEDB_EP_INSTALL_PREFIX}
+            ${TILEDB_DEPS_NO_DEFAULT_PATH}
+    )
+    set(GCSSDK_FOUND ${storage_client_FOUND})
+  endif()
 endif()
+
 
 if (NOT GCSSDK_FOUND)
   if (TILEDB_SUPERBUILD)
@@ -127,9 +136,9 @@ if (NOT GCSSDK_FOUND)
 endif()
 
 # If we found the SDK but it didn't have a cmake target build them
-if (GCSSDK_FOUND AND NOT TARGET storage_client)
+if (GCSSDK_FOUND AND NOT TARGET google_cloud_cpp_storage)
   # Build a list of all GCS libraries to link with.
-  list(APPEND GCSSDK_LINKED_LIBS "storage_client"
+  list(APPEND GCSSDK_LINKED_LIBS "google_cloud_cpp_storage"
                                  "google_cloud_cpp_common"
                                  "crc32c")
 
@@ -148,9 +157,9 @@ if (GCSSDK_FOUND AND NOT TARGET storage_client)
     endif()
   endforeach ()
 
-  if (NOT TARGET storage_client)
-    add_library(storage_client UNKNOWN IMPORTED)
-    set_target_properties(storage_client PROPERTIES
+  if (NOT TARGET google_cloud_cpp_storage)
+    add_library(google_cloud_cpp_storage UNKNOWN IMPORTED)
+    set_target_properties(google_cloud_cpp_storage PROPERTIES
       IMPORTED_LOCATION "${GCS_FOUND_storage_client};${GCS_FOUND_google_cloud_cpp_common};${GCS_FOUND_crc32c}"
       INTERFACE_INCLUDE_DIRECTORIES ${TILEDB_EP_INSTALL_PREFIX}/include
     )
