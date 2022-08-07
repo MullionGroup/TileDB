@@ -110,8 +110,6 @@ if (spdlog_FOUND AND NOT TARGET spdlog::spdlog)
   # If the target is defined we need to handle external fmt build types
 elseif(TARGET spdlog::spdlog)
   if (SPDLOG_FMT_EXTERNAL)
-    # Since we are using header only we need to define this
-    add_definitions("-DSPDLOG_FMT_EXTERNAL=1")
     find_package(fmt REQUIRED)
     if (${fmt_FOUND})
       target_link_libraries(spdlog::spdlog INTERFACE fmt::fmt)
