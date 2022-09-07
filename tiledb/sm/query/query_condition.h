@@ -41,13 +41,15 @@
 #include "tiledb/sm/array_schema/array_schema.h"
 #include "tiledb/sm/enums/query_condition_op.h"
 #include "tiledb/sm/query/ast/query_ast.h"
-#include "tiledb/sm/query/result_cell_slab.h"
-#include "tiledb/sm/query/result_tile.h"
 
 using namespace tiledb::common;
 
 namespace tiledb {
 namespace sm {
+
+class FragmentMetadata;
+struct ResultCellSlab;
+class ResultTile;
 
 enum class QueryConditionCombinationOp : uint8_t;
 
@@ -59,6 +61,18 @@ class QueryCondition {
 
   /** Default constructor. */
   QueryCondition();
+
+  /** Constructor from a marker. */
+  QueryCondition(const std::string& condition_marker);
+
+  /** Constructor from a tree. */
+  QueryCondition(tdb_unique_ptr<tiledb::sm::ASTNode>&& tree);
+
+  /** Constructor from a tree and marker. */
+  QueryCondition(
+      const uint64_t condition_index,
+      const std::string& condition_marker,
+      tdb_unique_ptr<tiledb::sm::ASTNode>&& tree);
 
   /** Copy constructor. */
   QueryCondition(const QueryCondition& rhs);
@@ -137,9 +151,15 @@ class QueryCondition {
   std::unordered_set<std::string>& field_names() const;
 
   /**
+   * Returns the timestamp for this condition.
+   */
+  uint64_t condition_timestamp() const;
+
+  /**
    * Applies this query condition to `result_cell_slabs`.
    *
    * @param array_schema The array schema associated with `result_cell_slabs`.
+   * @param fragment_metadata The fragment metadata.
    * @param result_cell_slabs The cell slabs to filter. Mutated to remove cell
    *   slabs that do not meet the criteria in this query condition.
    * @param stride The stride between cells.
@@ -147,6 +167,7 @@ class QueryCondition {
    */
   Status apply(
       const ArraySchema& array_schema,
+      const std::vector<shared_ptr<FragmentMetadata>>& fragment_metadata,
       std::vector<ResultCellSlab>& result_cell_slabs,
       uint64_t stride) const;
 
@@ -177,15 +198,18 @@ class QueryCondition {
    * @param array_schema The array schema.
    * @param result_tile The result tile to get the cells from.
    * @param result_bitmap The bitmap to use for results.
-   * @param cell_count The cell count after condition is applied.
    * @return Status
    */
   template <typename BitmapType>
   Status apply_sparse(
       const ArraySchema& array_schema,
       ResultTile& result_tile,
-      std::vector<BitmapType>& result_bitmap,
-      uint64_t* cell_count);
+      std::vector<BitmapType>& result_bitmap);
+
+  /**
+   * Reverse the query condition using De Morgan's law.
+   */
+  QueryCondition negated_condition();
 
   /**
    * Sets the AST. This is internal state to only be used in
@@ -198,6 +222,16 @@ class QueryCondition {
    * and the serialization path.
    */
   const tdb_unique_ptr<ASTNode>& ast() const;
+
+  /**
+   * Returns the condition marker.
+   */
+  const std::string& condition_marker() const;
+
+  /**
+   * Returns the condition index.
+   */
+  uint64_t condition_index() const;
 
  private:
   /* ********************************* */
@@ -226,6 +260,12 @@ class QueryCondition {
   /* ********************************* */
   /*         PRIVATE ATTRIBUTES        */
   /* ********************************* */
+  /** Marker used to reference which file the condition came from. */
+  std::string condition_marker_;
+
+  /** Index for the condition. */
+  size_t condition_index_;
+
   /** AST Tree structure representing the condition. **/
   tdb_unique_ptr<tiledb::sm::ASTNode> tree_{};
 
@@ -241,6 +281,7 @@ class QueryCondition {
    * templated for a query condition operator.
    *
    * @param node The value node to apply.
+   * @param fragment_metadata The fragment metadata.
    * @param stride The stride between cells.
    * @param var_size The attribute is var sized or not.
    * @param nullable The attribute is nullable or not.
@@ -252,6 +293,7 @@ class QueryCondition {
   template <typename T, QueryConditionOp Op, typename CombinationOp>
   void apply_ast_node(
       const tdb_unique_ptr<ASTNode>& node,
+      const std::vector<shared_ptr<FragmentMetadata>>& fragment_metadata,
       uint64_t stride,
       const bool var_size,
       const bool nullable,
@@ -264,6 +306,7 @@ class QueryCondition {
    * Applies a value node on primitive-typed result cell slabs.
    *
    * @param node The value node to apply.
+   * @param fragment_metadata The fragment metadata.
    * @param stride The stride between cells.
    * @param var_size The attribute is var sized or not.
    * @param nullable The attribute is nullable or not.
@@ -275,6 +318,7 @@ class QueryCondition {
   template <typename T, typename CombinationOp>
   void apply_ast_node(
       const tdb_unique_ptr<ASTNode>& node,
+      const std::vector<shared_ptr<FragmentMetadata>>& fragment_metadata,
       uint64_t stride,
       const bool var_size,
       const bool nullable,
@@ -289,6 +333,7 @@ class QueryCondition {
    *
    * @param node The value node to apply.
    * @param array_schema The current array schema.
+   * @param fragment_metadata The fragment metadata.
    * @param stride The stride between cells.
    * @param combination_op The combination op.
    * @param result_cell_bitmap The input cell bitmap.
@@ -298,6 +343,7 @@ class QueryCondition {
   void apply_ast_node(
       const tdb_unique_ptr<ASTNode>& node,
       const ArraySchema& array_schema,
+      const std::vector<shared_ptr<FragmentMetadata>>& fragment_metadata,
       uint64_t stride,
       const std::vector<ResultCellSlab>& result_cell_slabs,
       CombinationOp combination_op,
@@ -309,6 +355,7 @@ class QueryCondition {
    *
    * @param node The node to apply.
    * @param array_schema The array schema associated with `result_cell_slabs`.
+   * @param fragment_metadata The fragment metadata.
    * @param stride The stride between cells.
    * @param combination_op The combination op.
    * @param result_cell_bitmap A bitmap representation of cell slabs to filter.
@@ -320,6 +367,7 @@ class QueryCondition {
   void apply_tree(
       const tdb_unique_ptr<ASTNode>& node,
       const ArraySchema& array_schema,
+      const std::vector<shared_ptr<FragmentMetadata>>& fragment_metadata,
       uint64_t stride,
       const std::vector<ResultCellSlab>& result_cell_slabs,
       CombinationOp combination_op,

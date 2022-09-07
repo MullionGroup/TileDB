@@ -46,6 +46,7 @@
 #include "tiledb/common/unique_rwlock.h"
 #include "tiledb/sm/filesystem/gcs.h"
 #include "tiledb/sm/global_state/global_state.h"
+#include "tiledb/sm/misc/parallel_functions.h"
 #include "tiledb/sm/misc/tdb_math.h"
 #include "tiledb/sm/misc/utils.h"
 
@@ -351,9 +352,11 @@ Status GCS::remove_dir(const URI& uri) const {
 
   std::vector<std::string> paths;
   RETURN_NOT_OK(ls(uri, &paths, ""));
-  for (const auto& path : paths) {
-    RETURN_NOT_OK(remove_object(URI(path)));
-  }
+  auto status = parallel_for(thread_pool_, 0, paths.size(), [&](size_t i) {
+    RETURN_NOT_OK(remove_object(URI(paths[i])));
+    return Status::Ok();
+  });
+  RETURN_NOT_OK(status);
 
   return Status::Ok();
 }
@@ -445,7 +448,8 @@ tuple<Status, optional<std::vector<directory_entry>>> GCS::ls_with_sizes(
       entries.emplace_back(
           gcs_prefix + bucket_name + "/" +
               remove_front_slash(remove_trailing_slash(obj.name())),
-          obj.size());
+          obj.size(),
+          false);
     } else if (absl::holds_alternative<std::string>(results)) {
       // "Directories" are returned as strings here so we can't return
       // any metadata for them.
@@ -453,7 +457,8 @@ tuple<Status, optional<std::vector<directory_entry>>> GCS::ls_with_sizes(
           gcs_prefix + bucket_name + "/" +
               remove_front_slash(
                   remove_trailing_slash(absl::get<std::string>(results))),
-          0);
+          0,
+          true);
     }
   }
 
