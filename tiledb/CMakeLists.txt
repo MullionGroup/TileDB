@@ -543,7 +543,7 @@ endif()
 # GCS dependencies
 if (TILEDB_GCS)
   message(STATUS "The TileDB library is compiled with GCS support.")
-  find_package(google_cloud_cpp_storage REQUIRED COMPONENTS gcs)
+  find_package(GCSSDK_EP REQUIRED COMPONENTS gcs)
   target_link_libraries(TILEDB_CORE_OBJECTS_ILIB
     INTERFACE
        google-cloud-cpp::storage
