@@ -27,6 +27,11 @@
 # Include some common helper functions.
 include(TileDBCommon)
 
+# workaround for upstream issue in vcpkg provided WebP
+if (TILEDB_WEBP_EP_BUILT_VCPKG)
+  set(TILEDB_WEBP_EP_BUILT TRUE)
+endif()
+
 if (TILEDB_WEBP_EP_BUILT)
   find_package(WebP REQUIRED PATHS ${TILEDB_EP_INSTALL_PREFIX} ${TILEDB_DEPS_NO_DEFAULT_PATH})
 endif()
@@ -84,5 +89,9 @@ if (TILEDB_WEBP_EP_BUILT)
   install_target_libs(WebP::webp)
   install_target_libs(WebP::webpdecoder)
   install_target_libs(WebP::webpdemux)
-  install_target_libs(WebP::libwebpmux)
+  if (TILEDB_WEBP_EP_BUILT_VCPKG)
+    install_target_libs(WebP::libwebpmux)
+  else()
+    install_target_libs(WebP::webpmux)
+  endif()
 endif()
