@@ -60,7 +60,7 @@ if (TILEDB_LIBMAGIC_EP_BUILT)
 
   # Link statically if installed with the EP.
   find_library(libmagic_LIBRARIES
-    libmagic
+    magic
     PATHS ${LIBMAGIC_PATHS}
     PATH_SUFFIXES lib a
     #${TILEDB_DEPS_NO_DEFAULT_PATH}
